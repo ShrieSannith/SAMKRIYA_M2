@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/SAMKRIYA_M2/static/css/main.323d7611.css",
-    "main.js": "/SAMKRIYA_M2/static/js/main.1df4fa4b.js",
+    "main.js": "/SAMKRIYA_M2/static/js/main.93fe2f9a.js",
     "static/js/453.d7446e4a.chunk.js": "/SAMKRIYA_M2/static/js/453.d7446e4a.chunk.js",
     "index.html": "/SAMKRIYA_M2/index.html",
     "main.323d7611.css.map": "/SAMKRIYA_M2/static/css/main.323d7611.css.map",
-    "main.1df4fa4b.js.map": "/SAMKRIYA_M2/static/js/main.1df4fa4b.js.map",
+    "main.93fe2f9a.js.map": "/SAMKRIYA_M2/static/js/main.93fe2f9a.js.map",
     "453.d7446e4a.chunk.js.map": "/SAMKRIYA_M2/static/js/453.d7446e4a.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.323d7611.css",
-    "static/js/main.1df4fa4b.js"
+    "static/js/main.93fe2f9a.js"
   ]
 }
