@@ -55,7 +55,7 @@ export default function App() {
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
   const [bounds, setBounds] = useState(null);
 
-  /* ------------ Location Search API (Nominatim) ------------ */
+  /* ------------ Search API (Nominatim) ------------ */
   const searchAddress = async (query, setter) => {
     if (!query) return setter([]);
     const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${query}, Tamil Nadu, India`;
@@ -76,7 +76,7 @@ export default function App() {
   const onSelectSource = (data) => { setSource(data); setSourceResults([]); };
   const onSelectDestination = (data) => { setDestination(data); setDestResults([]); };
 
-  /* ------------ Fetch Routes from OSRM ------------ */
+  /* ------------ Fetch OSRM Route + Weighted ETA Logic ------------ */
   useEffect(() => {
     const fetchRoutes = async () => {
       if (!source || !destination) return;
@@ -85,18 +85,24 @@ export default function App() {
       const res = await axios.get(url);
 
       const fetched = res.data.routes.map((r, index) => {
-        const traffic = Math.floor(Math.random() * 60 + 20); // 20–80 %
-        const road = Math.floor(Math.random() * 50 + 50); // 50–100 %
-        const extraMinutes = traffic * 0.55; // traffic → more ETA
+        // dynamic metrics
+        const trafficLevel = Math.floor(Math.random() * 60 + 20); // 20 – 80 %
+        const roadQuality = Math.floor(Math.random() * 50 + 50); // 50 – 100 %
+
+        // weighted impact model
+        const trafficImpact = (trafficLevel / 100) * 0.45; // 45% effect on ETA
+        const roadImpact = ((50 - roadQuality) / 50) * 0.25; // 25% effect if roads are bad
+
+        const adjustedDuration = r.duration * (1 + trafficImpact + roadImpact);
 
         return {
           distance: r.distance,
           duration: r.duration,
-          adjustedDuration: r.duration + extraMinutes * 60,
+          adjustedDuration,
           latlngs: r.geometry.coordinates.map((c) => [c[1], c[0]]),
           bbox: r.bounds,
-          trafficLevel: traffic,
-          roadQuality: road,
+          trafficLevel,
+          roadQuality,
           priority: index + 1,
         };
       });
@@ -110,12 +116,11 @@ export default function App() {
 
   const formatDistance = (d) => `${(d / 1000).toFixed(1)} km`;
 
-  // 🔥 Hours + Minutes format
   const formatDuration = (seconds) => {
     const mins = Math.round(seconds / 60);
     const h = Math.floor(mins / 60);
     const m = mins % 60;
-    return `${h}h ${m}m`;
+    return h > 0 ? `${h}h ${m}m` : `${m} min`;
   };
 
   function MapFlyTo({ bounds }) {
@@ -130,7 +135,7 @@ export default function App() {
     <ThemeProvider theme={darkTheme}>
       <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
 
-        {/* Reopen Sidebar Button */}
+        {/* Toggle Sidebar Button */}
         {!sidebarOpen && (
           <IconButton
             onClick={() => setSidebarOpen(true)}
@@ -147,7 +152,7 @@ export default function App() {
           </IconButton>
         )}
 
-        {/* ---------- Sidebar ---------- */}
+        {/* Sidebar */}
         {sidebarOpen && (
           <Paper
             elevation={6}
@@ -170,7 +175,6 @@ export default function App() {
               </IconButton>
             </Box>
 
-            {/* Input Fields */}
             <TextField
               label="Source"
               fullWidth
@@ -231,24 +235,16 @@ export default function App() {
                 }}
               >
                 <Typography fontWeight={600}>Route {i + 1}</Typography>
-                <Typography fontSize={13}>
-                  Distance: {formatDistance(r.distance)}
-                </Typography>
-                <Typography fontSize={13}>
-                  ETA: {formatDuration(r.adjustedDuration)}
-                </Typography>
-                <Typography fontSize={13}>
-                  Traffic Level: {r.trafficLevel}%
-                </Typography>
-                <Typography fontSize={13}>
-                  Road Condition: {r.roadQuality}%
-                </Typography>
+                <Typography fontSize={13}>Distance: {formatDistance(r.distance)}</Typography>
+                <Typography fontSize={13}>ETA: {formatDuration(r.adjustedDuration)}</Typography>
+                <Typography fontSize={13}>Traffic Level: {r.trafficLevel}%</Typography>
+                <Typography fontSize={13}>Road Condition: {r.roadQuality}%</Typography>
               </Paper>
             ))}
           </Paper>
         )}
 
-        {/* ---------- MAP SECTION ---------- */}
+        {/* ---------- MAP ---------- */}
         <Box sx={{ flex: 1 }}>
           <MapContainer
             center={TAMIL_NADU_CENTER}
@@ -260,7 +256,6 @@ export default function App() {
               url="https://cartodb-basemaps-b.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png"
             />
 
-            {/* Markers */}
             {source && (
               <Marker position={[source.lat, source.lon]}>
                 <Popup><strong>Source</strong><br />{source.display_name}</Popup>
@@ -273,7 +268,6 @@ export default function App() {
               </Marker>
             )}
 
-            {/* Route Lines */}
             {routes.map((r, i) => (
               <Polyline
                 key={i}
@@ -291,10 +285,10 @@ export default function App() {
                 }}
               >
                 <Tooltip sticky>
-                  <b>Route {i + 1}</b> <br />
-                  Distance: {formatDistance(r.distance)} <br />
-                  ETA: {formatDuration(r.adjustedDuration)} <br />
-                  Traffic Level: {r.trafficLevel}% <br />
+                  <b>Route {i + 1}</b><br />
+                  Distance: {formatDistance(r.distance)}<br />
+                  ETA: {formatDuration(r.adjustedDuration)}<br />
+                  Traffic Level: {r.trafficLevel}%<br />
                   Road Condition: {r.roadQuality}%
                 </Tooltip>
               </Polyline>
