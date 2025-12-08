@@ -25,9 +25,7 @@ const darkTheme = createTheme({
     mode: "dark",
     background: { default: "#0d0d0d", paper: "#1a1a1a" },
   },
-  typography: {
-    fontFamily: "Inter, Arial, sans-serif",
-  },
+  typography: { fontFamily: "Inter, Arial, sans-serif" },
 });
 
 /* ------------ Fix Leaflet Default Icons ------------ */
@@ -38,19 +36,18 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-/* ------------ Center for Tamil Nadu ------------ */
+/* ------------ Map Center ------------ */
 const TAMIL_NADU_CENTER = [10.9094, 78.3665];
 
 export default function App() {
   const mapRef = useRef(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sourceQuery, setSourceQuery] = useState("");
   const [destQuery, setDestQuery] = useState("");
 
   const [sourceResults, setSourceResults] = useState([]);
   const [destResults, setDestResults] = useState([]);
-
   const [source, setSource] = useState(null);
   const [destination, setDestination] = useState(null);
 
@@ -58,7 +55,7 @@ export default function App() {
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(null);
   const [bounds, setBounds] = useState(null);
 
-  /* ------------ Search API (Nominatim) ------------ */
+  /* ------------ Location Search API (Nominatim) ------------ */
   const searchAddress = async (query, setter) => {
     if (!query) return setter([]);
     const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${query}, Tamil Nadu, India`;
@@ -67,38 +64,42 @@ export default function App() {
   };
 
   useEffect(() => {
-    const t = setTimeout(() => searchAddress(sourceQuery, setSourceResults), 450);
+    const t = setTimeout(() => searchAddress(sourceQuery, setSourceResults), 350);
     return () => clearTimeout(t);
   }, [sourceQuery]);
 
   useEffect(() => {
-    const t = setTimeout(() => searchAddress(destQuery, setDestResults), 450);
+    const t = setTimeout(() => searchAddress(destQuery, setDestResults), 350);
     return () => clearTimeout(t);
   }, [destQuery]);
 
-  const onSelectSource = (data) => {
-    setSource(data);
-    setSourceResults([]);
-  };
-  const onSelectDestination = (data) => {
-    setDestination(data);
-    setDestResults([]);
-  };
+  const onSelectSource = (data) => { setSource(data); setSourceResults([]); };
+  const onSelectDestination = (data) => { setDestination(data); setDestResults([]); };
 
-  /* ------------ OSRM Routing ------------ */
+  /* ------------ Fetch Routes from OSRM ------------ */
   useEffect(() => {
     const fetchRoutes = async () => {
       if (!source || !destination) return;
+
       const url = `https://router.project-osrm.org/route/v1/driving/${source.lon},${source.lat};${destination.lon},${destination.lat}?alternatives=true&geometries=geojson&overview=full`;
       const res = await axios.get(url);
 
-      const fetched = res.data.routes.map((r) => ({
-        distance: r.distance,
-        duration: r.duration,
-        adjustedDuration: r.duration,
-        latlngs: r.geometry.coordinates.map((c) => [c[1], c[0]]),
-        bbox: r.bounds,
-      }));
+      const fetched = res.data.routes.map((r, index) => {
+        const traffic = Math.floor(Math.random() * 60 + 20); // 20–80 %
+        const road = Math.floor(Math.random() * 50 + 50); // 50–100 %
+        const extraMinutes = traffic * 0.55; // traffic → more ETA
+
+        return {
+          distance: r.distance,
+          duration: r.duration,
+          adjustedDuration: r.duration + extraMinutes * 60,
+          latlngs: r.geometry.coordinates.map((c) => [c[1], c[0]]),
+          bbox: r.bounds,
+          trafficLevel: traffic,
+          roadQuality: road,
+          priority: index + 1,
+        };
+      });
 
       setRoutes(fetched);
     };
@@ -106,8 +107,16 @@ export default function App() {
   }, [source, destination]);
 
   const getRouteColor = (i) => ["#4fc3f7", "#ffb74d", "#81c784", "#ce93d8"][i % 4];
+
   const formatDistance = (d) => `${(d / 1000).toFixed(1)} km`;
-  const formatDuration = (d) => `${Math.round(d / 60)} min`;
+
+  // 🔥 Hours + Minutes format
+  const formatDuration = (seconds) => {
+    const mins = Math.round(seconds / 60);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${m}m`;
+  };
 
   function MapFlyTo({ bounds }) {
     const map = mapRef.current;
@@ -121,7 +130,7 @@ export default function App() {
     <ThemeProvider theme={darkTheme}>
       <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
 
-        {/* Floating button to reopen sidebar */}
+        {/* Reopen Sidebar Button */}
         {!sidebarOpen && (
           <IconButton
             onClick={() => setSidebarOpen(true)}
@@ -138,14 +147,14 @@ export default function App() {
           </IconButton>
         )}
 
-        {/* ---------- Left Sidebar (Collapsible) ---------- */}
+        {/* ---------- Sidebar ---------- */}
         {sidebarOpen && (
           <Paper
-            elevation={8}
+            elevation={6}
             sx={{
               width: { xs: "88%", sm: 360 },
               p: 2,
-              backdropFilter: "blur(10px)",
+              backdropFilter: "blur(8px)",
               bgcolor: "rgba(20,20,20,0.85)",
               overflowY: "auto",
               borderRight: "1px solid #444",
@@ -160,19 +169,18 @@ export default function App() {
                 <CloseIcon sx={{ color: "white" }} />
               </IconButton>
             </Box>
-            <Typography variant="body2" sx={{ mb: 2, color: "gray" }}>Team Marvels</Typography>
 
-            {/* Source Input */}
+            {/* Input Fields */}
             <TextField
               label="Source"
               fullWidth
               size="small"
               value={sourceQuery}
               onChange={(e) => setSourceQuery(e.target.value)}
-              sx={{ mb: 2 }}
+              sx={{ mt: 2 }}
             />
             {sourceResults.length > 0 && (
-              <List sx={{ maxHeight: 150, overflowY: "auto", bgcolor: "#252525" }}>
+              <List sx={{ maxHeight: 130, overflowY: "auto", bgcolor: "#252525" }}>
                 {sourceResults.map((r, i) => (
                   <ListItemButton key={i} onClick={() => onSelectSource(r)}>
                     <ListItemText primary={r.display_name} />
@@ -181,17 +189,16 @@ export default function App() {
               </List>
             )}
 
-            {/* Destination Input */}
             <TextField
               label="Destination"
               fullWidth
               size="small"
               value={destQuery}
               onChange={(e) => setDestQuery(e.target.value)}
-              sx={{ mt: 2, mb: 2 }}
+              sx={{ mt: 2 }}
             />
             {destResults.length > 0 && (
-              <List sx={{ maxHeight: 150, overflowY: "auto", bgcolor: "#252525" }}>
+              <List sx={{ maxHeight: 130, overflowY: "auto", bgcolor: "#252525" }}>
                 {destResults.map((r, i) => (
                   <ListItemButton key={i} onClick={() => onSelectDestination(r)}>
                     <ListItemText primary={r.display_name} />
@@ -202,7 +209,7 @@ export default function App() {
 
             <Divider sx={{ my: 2 }} />
 
-            <Typography variant="h6" sx={{ mb: 1 }}>Routes</Typography>
+            <Typography variant="h6" sx={{ mb: 1 }}>Available Routes</Typography>
 
             {routes.length === 0 && (
               <Typography sx={{ color: "gray" }}>Select source & destination…</Typography>
@@ -211,10 +218,6 @@ export default function App() {
             {routes.map((r, i) => (
               <Paper
                 key={i}
-                onClick={() => {
-                  setSelectedRouteIndex(i);
-                  setBounds(r.bbox);
-                }}
                 sx={{
                   p: 1.5,
                   mb: 1,
@@ -222,17 +225,30 @@ export default function App() {
                   bgcolor: selectedRouteIndex === i ? "#2a3642" : "#1f1f1f",
                   borderLeft: `6px solid ${getRouteColor(i)}`,
                 }}
+                onClick={() => {
+                  setSelectedRouteIndex(i);
+                  setBounds(r.bbox);
+                }}
               >
                 <Typography fontWeight={600}>Route {i + 1}</Typography>
                 <Typography fontSize={13}>
-                  {formatDistance(r.distance)} • ETA: {formatDuration(r.adjustedDuration)}
+                  Distance: {formatDistance(r.distance)}
+                </Typography>
+                <Typography fontSize={13}>
+                  ETA: {formatDuration(r.adjustedDuration)}
+                </Typography>
+                <Typography fontSize={13}>
+                  Traffic Level: {r.trafficLevel}%
+                </Typography>
+                <Typography fontSize={13}>
+                  Road Condition: {r.roadQuality}%
                 </Typography>
               </Paper>
             ))}
           </Paper>
         )}
 
-        {/* ---------- Map Section ---------- */}
+        {/* ---------- MAP SECTION ---------- */}
         <Box sx={{ flex: 1 }}>
           <MapContainer
             center={TAMIL_NADU_CENTER}
@@ -242,9 +258,9 @@ export default function App() {
           >
             <TileLayer
               url="https://cartodb-basemaps-b.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png"
-              attribution="© OpenStreetMap, © CARTO"
             />
 
+            {/* Markers */}
             {source && (
               <Marker position={[source.lat, source.lon]}>
                 <Popup><strong>Source</strong><br />{source.display_name}</Popup>
@@ -257,6 +273,7 @@ export default function App() {
               </Marker>
             )}
 
+            {/* Route Lines */}
             {routes.map((r, i) => (
               <Polyline
                 key={i}
@@ -264,7 +281,7 @@ export default function App() {
                 pathOptions={{
                   color: getRouteColor(i),
                   weight: selectedRouteIndex === i ? 7 : 4,
-                  opacity: selectedRouteIndex === i ? 1 : 0.75,
+                  opacity: selectedRouteIndex === i ? 1 : 0.7,
                 }}
                 eventHandlers={{
                   click: () => {
@@ -274,9 +291,11 @@ export default function App() {
                 }}
               >
                 <Tooltip sticky>
-                  <b>Route {i + 1}</b><br />
+                  <b>Route {i + 1}</b> <br />
+                  Distance: {formatDistance(r.distance)} <br />
                   ETA: {formatDuration(r.adjustedDuration)} <br />
-                  Dist: {formatDistance(r.distance)}
+                  Traffic Level: {r.trafficLevel}% <br />
+                  Road Condition: {r.roadQuality}%
                 </Tooltip>
               </Polyline>
             ))}
